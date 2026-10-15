@@ -1,0 +1,81 @@
+{
+  "manifest_version": 3,
+  "name": "OJ Bridge · 在 VS Code 编程",
+  "short_name": "OJ Bridge",
+  "version": "1.1.0",
+  "description": "为 OJ 题目创建带信息的 C++ 文件，并将已保存代码填入网页 IDE 或复制。",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuPP2F6dE3+hVWLLeLihxe56spWv/HUYBZASVZ6vK2quvoL7aCX8nRVUCuL1AW+TiGwA1uWGSjx6Fpks5QVl2SnYJNt4y2pCiUNmKlQx7l9KdGxXFUC0eBTa61kdmilBWc+9JJecJTGLHrD42fouBSCZvDzkK9cyj5svvhqz0inQ3xBBd51eBsDyPoWLbO8zHa86WQ/5C7HstmsNJLUxN70I3hSEG8eu9uUpjvCAodfFAqsdX7sGFaKxO1jDVgsdi2G8p5kJNjSNTciDvmcLEm9GUpQb6qiOTfvrccyr7ptOcuLprwF6YtVJWnSOyK6cpAG4vEv9yUkoqgY906ES42wIDAQAB",
+  "permissions": [
+    "nativeMessaging",
+    "storage",
+    "scripting",
+    "clipboardWrite",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://*.luogu.com.cn/*",
+    "https://*.luogu.com/*",
+    "https://oj.shumeng.tech/*",
+    "https://atcoder.jp/*",
+    "https://codeforces.com/*",
+    "https://*.codeforces.com/*",
+    "https://ac.nowcoder.com/*",
+    "https://www.nowcoder.com/*",
+    "https://loj.ac/*",
+    "https://www.loj.ac/*",
+    "https://hydro.ac/*",
+    "https://*.hydro.ac/*",
+    "https://hydrooj.com/*",
+    "https://*.hydrooj.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "OJ Bridge",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.luogu.com.cn/*",
+        "https://*.luogu.com/*",
+        "https://oj.shumeng.tech/*",
+        "https://atcoder.jp/*",
+        "https://codeforces.com/*",
+        "https://*.codeforces.com/*",
+        "https://ac.nowcoder.com/*",
+        "https://www.nowcoder.com/*",
+        "https://loj.ac/*",
+        "https://www.loj.ac/*",
+        "https://hydro.ac/*",
+        "https://*.hydro.ac/*",
+        "https://hydrooj.com/*",
+        "https://*.hydrooj.com/*"
+      ],
+      "js": [
+        "core.js",
+        "content.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}

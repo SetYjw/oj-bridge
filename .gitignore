@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+node_modules/
+.venv/
+native/config.json
+native/host.cmd
+native/host-manifest.json
+.oj-bridge/
+dist/
+work/
+*.exe
+*.zip
+*.log
+.DS_Store
+Thumbs.db

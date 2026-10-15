@@ -1,0 +1,17 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "OJ Bridge: debug active C++ file",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}\\exe\\${fileBasenameNoExtension}.exe",
+      "args": [],
+      "cwd": "${fileDirname}",
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "miDebuggerPath": "gdb",
+      "preLaunchTask": "OJ Bridge: build active C++ file"
+    }
+  ]
+}
