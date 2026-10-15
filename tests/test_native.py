@@ -20,7 +20,7 @@ bridge = importlib.util.module_from_spec(spec); spec.loader.exec_module(bridge)
 class HostTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.base = Path(self.temp.name)
+        self.base = Path(self.temp.name).resolve()
         self.config_path = self.base/'config.json'
         self.root = self.base/'中文 source files'
         self.config = bridge.DEFAULT_CONFIG | {'root':str(self.root),'code_path':sys.executable}
