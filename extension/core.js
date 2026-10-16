@@ -1,6 +1,6 @@
 (function (global) {
   'use strict';
-  const labels = { Luogu: '洛谷', Shumeng: '曙梦', AtCoder: 'AtCoder', Codeforces: 'Codeforces', NowCoder: '牛客竞赛', LibreOJ: 'LibreOJ', Hydro: 'Hydro' };
+  const labels = { Luogu: '洛谷', Shumeng: '曙梦', AtCoder: 'AtCoder', Codeforces: 'Codeforces', NowCoder: '牛客竞赛', LibreOJ: 'LibreOJ', Hydro: 'Hydro', LeetCodeCN: '力扣中文站', LeetCode: 'LeetCode' };
   const direct = new Set(['AtCoder', 'Codeforces', 'Shumeng', 'Hydro']);
   function parseUrl(raw) {
     let u; try { u = new URL(raw); } catch { return null; }
@@ -8,7 +8,11 @@
     let platform, id, submitUrl, path, m;
     let host = u.hostname.toLowerCase();
     const p = u.pathname.replace(/\/$/, '');
-    if (['www.luogu.com.cn', 'www.luogu.com', 'luogu.com.cn', 'luogu.com'].includes(host) && (m = p.match(/^\/problem\/([\w-]+)(?:\/submit)?$/))) {
+    if (['leetcode.cn', 'www.leetcode.cn', 'leetcode.com', 'www.leetcode.com'].includes(host) && (m = p.match(/^\/(?:contest\/[\w-]+\/)?problems\/([a-z0-9-]+)(?:\/(?:description|editorial|solutions|submissions))?$/))) {
+      host = host.replace(/^www\./, '');
+      platform = host === 'leetcode.cn' ? 'LeetCodeCN' : 'LeetCode'; id = m[1]; path = `/problems/${id}`;
+      submitUrl = `https://${host}${path}/description/`;
+    } else if (['www.luogu.com.cn', 'www.luogu.com', 'luogu.com.cn', 'luogu.com'].includes(host) && (m = p.match(/^\/problem\/([\w-]+)(?:\/submit)?$/))) {
       platform = 'Luogu'; id = m[1]; host = 'www.luogu.com.cn'; path = `/problem/${id}`;
       submitUrl = `https://${host}${path}#submit`;
     } else if (host === 'oj.shumeng.tech' && (m = p.match(/^\/p\/([\w-]+)(?:\/submit)?$/))) {
@@ -37,6 +41,7 @@
     if (!problem || !parseUrl(problem.url)) return false;
     let page, expected; try { page = new URL(raw); expected = new URL(problem.submitUrl || parseUrl(problem.url).submitUrl); } catch { return false; }
     if (page.origin !== expected.origin || page.username || page.password) return false;
+    if (isLeetCode(problem)) return parseUrl(raw)?.url === problem.url;
     if (problem.platform === 'AtCoder') {
       const task = page.searchParams.get('taskScreenName');
       return page.pathname === expected.pathname && (!task || task === problem.id);
@@ -49,7 +54,8 @@
     const selectors = {
       Luogu: ['h1', '.problem-title'], Shumeng: ['h1', '.section__title'],
       AtCoder: ['#main-container .h2', '.h2'], Codeforces: ['.problem-statement .title'],
-      NowCoder: ['.subject-item-title', '.subject-title', 'h1'], LibreOJ: ['h1', '.problem-title'], Hydro: ['h1', '.section__title']
+      NowCoder: ['.subject-item-title', '.subject-title', 'h1'], LibreOJ: ['h1', '.problem-title'], Hydro: ['h1', '.section__title'],
+      LeetCodeCN: ['[data-cy="question-title"]', 'h1'], LeetCode: ['[data-cy="question-title"]', 'h1']
     };
     let title = '';
     for (const selector of selectors[info.platform]) {
@@ -62,6 +68,7 @@
     }
     title ||= document.title;
     title = title.replace(/\s+/g, ' ').replace(/\s*[-|－]\s*(洛谷|Luogu|AtCoder|Hydro|曙梦.*|LibreOJ|Codeforces).*$/i, '').trim();
+    if (isLeetCode(info)) title = title.replace(/\s*[-|－]\s*(?:力扣|LeetCode).*$/i, '').replace(/^\d+\.\s*/, '');
     const escapedId = info.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     title = title.replace(new RegExp(`^${escapedId}(?:\\s+|[.：:]\\s*)`, 'i'), '');
     if (['AtCoder', 'Codeforces', 'NowCoder'].includes(info.platform)) title = title.replace(/^[A-Z][A-Z0-9]*\s*[.\-－]\s*/, '');
@@ -73,7 +80,15 @@
     info.timeLimit = info.timeLimit.split(/\s*\/\s*Memory Limit|\s*内存限制/i)[0].trim();
     return info;
   }
-  const api = { parseUrl, isSubmitFor, readProblem, labels, direct };
+  function isLeetCode(problem) { return ['LeetCode', 'LeetCodeCN'].includes(problem?.platform); }
+  function leetCodeMetadata(data, problem) {
+    const question = data?.data?.question;
+    if (!isLeetCode(problem) || question?.titleSlug !== problem.id) throw new Error('力扣返回的题目与当前页面不一致。');
+    const starterCode = question.codeSnippets?.find(s => s.langSlug === 'cpp')?.code;
+    if (typeof starterCode !== 'string' || !starterCode.trim() || starterCode.length > 32768 || starterCode.includes('\0')) throw new Error('未取得该题的官方 C++ 初始代码。');
+    return { title: String((problem.platform === 'LeetCodeCN' && question.translatedTitle) || question.title || problem.title).slice(0, 180), frontendId: String(question.questionFrontendId || '').slice(0, 80), starterCode };
+  }
+  const api = { parseUrl, isSubmitFor, readProblem, isLeetCode, leetCodeMetadata, labels, direct };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.OJCore = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

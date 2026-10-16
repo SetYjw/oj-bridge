@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "OJ Bridge · 在 VS Code 编程",
   "short_name": "OJ Bridge",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "为 OJ 题目创建带信息的 C++ 文件，并将已保存代码填入网页 IDE 或复制。",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuPP2F6dE3+hVWLLeLihxe56spWv/HUYBZASVZ6vK2quvoL7aCX8nRVUCuL1AW+TiGwA1uWGSjx6Fpks5QVl2SnYJNt4y2pCiUNmKlQx7l9KdGxXFUC0eBTa61kdmilBWc+9JJecJTGLHrD42fouBSCZvDzkK9cyj5svvhqz0inQ3xBBd51eBsDyPoWLbO8zHa86WQ/5C7HstmsNJLUxN70I3hSEG8eu9uUpjvCAodfFAqsdX7sGFaKxO1jDVgsdi2G8p5kJNjSNTciDvmcLEm9GUpQb6qiOTfvrccyr7ptOcuLprwF6YtVJWnSOyK6cpAG4vEv9yUkoqgY906ES42wIDAQAB",
   "permissions": [
@@ -26,7 +26,11 @@
     "https://hydro.ac/*",
     "https://*.hydro.ac/*",
     "https://hydrooj.com/*",
-    "https://*.hydrooj.com/*"
+    "https://*.hydrooj.com/*",
+    "https://leetcode.cn/*",
+    "https://www.leetcode.cn/*",
+    "https://leetcode.com/*",
+    "https://www.leetcode.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -65,7 +69,11 @@
         "https://hydro.ac/*",
         "https://*.hydro.ac/*",
         "https://hydrooj.com/*",
-        "https://*.hydrooj.com/*"
+        "https://*.hydrooj.com/*",
+        "https://leetcode.cn/*",
+        "https://www.leetcode.cn/*",
+        "https://leetcode.com/*",
+        "https://www.leetcode.com/*"
       ],
       "js": [
         "core.js",

@@ -12,7 +12,15 @@
     element.dispatchEvent(new Event('input', { bubbles: true }));
     element.dispatchEvent(new Event('change', { bubbles: true }));
   }
-  function chooseLanguage() {
+  const isLeetCode = problem => ['LeetCode', 'LeetCodeCN'].includes(problem?.platform);
+  function leetCodeEditors() {
+    return (global.monaco?.editor?.getEditors?.() || []).filter(editor =>
+      visible(editor.getDomNode?.()) && !editor.getRawOptions?.().readOnly && editor.getModel?.()?.getLanguageId?.() === 'cpp');
+  }
+  function chooseLanguage(problem) {
+    // LeetCode uses a custom language menu and also mounts testcase editors.
+    // Confirm the actual source model instead of guessing from button text.
+    if (isLeetCode(problem)) return leetCodeEditors().length === 1;
     const select = [...document.querySelectorAll('#select-lang, #select-language, select[name="data.LanguageId"], select[name="language_id"], select[name="languageId"], select[name="programTypeId"], select[name="language"], select[name="lang"]')].find(e => e.tagName === 'SELECT' && !e.disabled);
     if (!select) return false;
     const options = [...select.options].filter(o => !o.disabled && /(?:C\+\+|GNU\+\+|G\+\+)/i.test(o.textContent));
@@ -23,6 +31,11 @@
     return /(?:C\+\+|GNU\+\+|G\+\+)/i.test(select.selectedOptions[0]?.textContent || '');
   }
   function checkTask(problem) {
+    if (isLeetCode(problem)) {
+      const original = new URL(problem.url);
+      const match = location.pathname.replace(/\/$/, '').match(/^\/(?:contest\/[\w-]+\/)?problems\/([a-z0-9-]+)(?:\/(?:description|editorial|solutions|submissions))?$/);
+      return location.origin === original.origin && match?.[1] === problem.id;
+    }
     if (problem.platform === 'AtCoder') {
       const select = document.querySelector('#select-task, select[name="data.TaskScreenName"]');
       if (!select) return false;
@@ -42,7 +55,19 @@
     const original = new URL(problem.url);
     return location.origin === original.origin && location.pathname.replace(/\/submit\/?$/, '').replace(/\/$/, '') === original.pathname;
   }
-  function writeEditor(code) {
+  function writeEditor(code, problem) {
+    if (isLeetCode(problem)) {
+      const editors = leetCodeEditors();
+      if (editors.length !== 1) throw new Error('请先在力扣网页选择 C++，并只打开一个代码编辑区，再点击填入；也可以使用复制代码。');
+      const editor = editors[0], model = editor.getModel();
+      // An edit operation participates in Monaco undo and notifies the site's
+      // normal change listeners, so its Run/Submit controls see the new source.
+      editor.pushUndoStop?.();
+      if (editor.executeEdits && model.getFullModelRange) editor.executeEdits('oj-bridge', [{ range: model.getFullModelRange(), text: code, forceMoveMarkers: true }]);
+      else model.setValue(code);
+      editor.pushUndoStop?.();
+      return { kind: 'LeetCode Monaco', read: () => model.getValue() };
+    }
     const monacoNodes = [...document.querySelectorAll('.monaco-editor')].filter(visible);
     if (monacoNodes.length && global.monaco?.editor) {
       const editors = global.monaco.editor.getEditors?.().filter(e => visible(e.getDomNode?.())) || [];
@@ -95,11 +120,12 @@
       if (location.href !== options.pageUrl) throw new Error('页面已变化，请在当前题目上重新操作。');
       if (typeof code !== 'string' || !code.trim()) throw new Error('源码为空，请先在 VS Code 保存。');
       const taskConfirmed = checkTask(options.problem);
-      const languageConfirmed = chooseLanguage();
+      const languageConfirmed = chooseLanguage(options.problem);
+      if (isLeetCode(options.problem) && !taskConfirmed) throw new Error('力扣题目已经变化，请在当前题目重新操作。');
       // Sites often recreate their editor when the language changes.
       await new Promise(resolve => setTimeout(resolve, 350));
       if (location.href !== options.pageUrl) throw new Error('页面已跳转，请重新操作。');
-      const editor = writeEditor(code);
+      const editor = writeEditor(code, options.problem);
       await new Promise(resolve => setTimeout(resolve, 150));
       if (normalize(editor.read()) !== normalize(code)) throw new Error('网页编辑器的内容未能保持一致，请使用复制代码。');
       if (!options.submit) return { ok: true, editor: editor.kind, submitted: false, languageConfirmed, message: `已填入 ${editor.kind}。请核对语言和题号后使用网页提交按钮。` };

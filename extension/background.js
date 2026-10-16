@@ -15,6 +15,23 @@ function native(message) {
   });
 }
 async function stored(key) { return (await chrome.storage.session.get(key))[key]; }
+async function withLeetCodeStarter(problem) {
+  if (!OJCore.isLeetCode(problem)) return problem;
+  try {
+    // Only public question metadata; never send account cookies or saved solutions.
+    const response = await fetch(new URL('/graphql/', problem.url), {
+      method: 'POST', credentials: 'omit', redirect: 'error', signal: AbortSignal.timeout(10000),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: 'query ojBridgeStarter($titleSlug: String!) { question(titleSlug: $titleSlug) { titleSlug questionFrontendId title translatedTitle codeSnippets { langSlug code } } }', variables: { titleSlug: problem.id } })
+    });
+    if (!response.ok) throw new Error('无法读取力扣题目');
+    return { ...problem, ...OJCore.leetCodeMetadata(await response.json(), problem) };
+  } catch {
+    // Existing files must still reopen during a network outage. The host requires
+    // the official template only if it actually needs to create a new file.
+    return problem;
+  }
+}
 async function problemFor(sender, supplied) {
   if (!sender.tab || sender.frameId !== 0) throw new Error('请在题目的主页面操作。');
   const raw = sender.url || sender.tab.url;
@@ -68,7 +85,7 @@ async function handle(message, sender) {
   if (busy.has(id)) throw new Error('正在处理上一个操作，请稍候。');
   busy.add(id);
   try {
-    if (message.action === 'open') return native({ action: 'open', problem });
+    if (message.action === 'open') return native({ action: 'open', problem: await withLeetCodeStarter(problem) });
     if (message.action === 'copy') return native({ action: 'read', problem });
     if (message.action === 'resume') {
       const pending = await stored(pendingKey(id));

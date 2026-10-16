@@ -54,3 +54,15 @@ Chrome 的注册和通用 MV3 文件已提供，但未运行 Chrome 实机验证
 ![洛谷题目工具条](Luogu-toolbar.png)
 
 ![AtCoder 题目工具条](AtCoder-toolbar.png)
+
+## 1.2.0 力扣支持验证（2026-10-16）
+
+本地 Python 30/30、Node 20/20、Edge 20/20。新增检查包括中英文站及比赛/题库身份统一、设计题官方类名、缺失/超长/不匹配模板、离线重开不覆盖、SPA 切题后身份核对、其他语言拒绝回填和多编辑器隔离。Edge 样本通过真实 Native Messaging 创建文件、读取保存内容并回填；模板接口在样本测试中模拟，不执行真实提交。
+
+另用隔离的 Edge profile 和实际扩展检查当前公开站点：
+
+- [力扣中文站两数之和](https://leetcode.cn/problems/two-sum/description/)：工具条出现，官方题号 1、中文题名和 C++ 模板读取通过；MAIN world 使用真实 Monaco 的 executeEdits 完成填入及回读。仅 C++ 模型变化，plaintext 测试用例模型未变化。
+- [LeetCode 国际站两数之和](https://leetcode.com/problems/two-sum/description/)：扩展后台读取官方英文题名、题号和 C++ 模板通过；本次浏览器页面出现站点验证，未验证国际站真实编辑器填入。
+- 模板请求使用 credentials: omit，不读取用户账号/Cookie；没有登录用户账号，没有点击真实运行或提交按钮。
+
+力扣使用函数/类判题，因此模板不带 main()，本地直接运行需要自行增加测试入口。当前版本提供填入/复制，提交由用户点击网页按钮。

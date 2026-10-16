@@ -49,6 +49,40 @@ class HostTests(unittest.TestCase):
         self.assertFalse(second['created']);self.assertEqual(first['path'],second['path'])
         self.assertEqual(Path(first['path']).read_text(),'int main(){return 42;}')
 
+    def test_leetcode_official_cpp_template_and_number(self):
+        problem={'url':'https://leetcode.cn/problems/two-sum/description/','title':'两数之和','frontendId':'1','starterCode':'class Solution {\npublic:\n    vector<int> twoSum(vector<int>& nums, int target) {\n    }\n};'}
+        result=self.host.handle({'action':'open','problem':problem})
+        path=Path(result['path']);text=path.read_text(encoding='utf-8')
+        self.assertEqual(path.name,'LeetCodeCN_1_两数之和.cpp')
+        self.assertIn('题号：1',text);self.assertIn('class Solution',text)
+        self.assertIn('#include<bits/stdc++.h>',text);self.assertNotIn('int main()',text)
+        self.assertNotIn('starterCode',(self.root/'.oj-bridge/index.json').read_text(encoding='utf-8'))
+
+    def test_leetcode_design_class_is_not_replaced_with_solution(self):
+        result=self.host.handle({'action':'open','problem':{'url':'https://leetcode.com/problems/lru-cache/','starterCode':'class LRUCache {\npublic:\n    LRUCache(int capacity) {}\n};'}})
+        text=Path(result['path']).read_text(encoding='utf-8')
+        self.assertIn('class LRUCache',text);self.assertNotIn('class Solution',text);self.assertNotIn('int main()',text)
+
+    def test_leetcode_missing_or_invalid_template_never_creates_empty_file(self):
+        for starter in ['',None,12,'x'*32769,'bad\0text']:
+            with self.assertRaisesRegex(bridge.BridgeError,r'官方 C\+\+'):
+                self.host.handle({'action':'open','problem':{'url':'https://leetcode.cn/problems/two-sum/','starterCode':starter}})
+            self.assertEqual(list(self.root.glob('*.cpp')),[])
+
+    def test_leetcode_offline_reopen_and_read_preserve_saved_code(self):
+        problem={'url':'https://leetcode.cn/problems/two-sum/','starterCode':'class Solution {};'}
+        result=self.host.handle({'action':'open','problem':problem});path=Path(result['path']);path.write_text('// saved answer',encoding='utf-8')
+        offline={'url':'https://leetcode.cn/problems/two-sum/submissions/'}
+        self.assertFalse(self.host.handle({'action':'open','problem':offline})['created'])
+        self.assertEqual(self.host.handle({'action':'read','problem':offline})['code'],'// saved answer')
+
+    def test_leetcode_alias_contest_and_region_identity(self):
+        cn=bridge.parse_problem_url('https://www.leetcode.cn/contest/weekly-contest-400/problems/two-sum/')
+        self.assertEqual(cn,bridge.parse_problem_url('https://leetcode.cn/problems/two-sum/description/'))
+        self.assertNotEqual(cn['url'],bridge.parse_problem_url('https://leetcode.com/problems/two-sum/')['url'])
+        for url in ['https://leetcode.cn.evil.test/problems/two-sum/','https://leetcode.cn/submissions/detail/123/','https://leetcode.cn/problems/two-sum/solutions/123/answer/','https://user:password@leetcode.cn/problems/two-sum/']:
+            with self.assertRaises(bridge.BridgeError):bridge.parse_problem_url(url)
+
     def test_unrelated_name_collision_is_preserved(self):
         self.root.mkdir();existing=self.root/'Luogu_P1001_A+B Problem.cpp';existing.write_text('original')
         result=self.host.handle({'action':'open','problem':self.problem})

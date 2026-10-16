@@ -110,6 +110,69 @@ open(sys.argv[2],'w',encoding='utf-8').write(json.dumps(data))`, JSON.stringify(
     const editorScript = path.join(ROOT, 'extension/editor.js');
     const taskOptions = { platform: 'AtCoder', id: 'abc425_a', url: 'https://atcoder.jp/contests/abc425/tasks/abc425_a' };
     const baseForm = '<form id="submit-form"><select id="select-task" name="data.TaskScreenName"><option value="abc425_b">B</option><option value="abc425_a">A</option></select><select id="select-lang" name="data.LanguageId"><option value="py">Python</option><option value="cpp17">C++17 (GCC)</option><option value="cpp20">C++20 (GCC)</option></select><button id="submit" type="submit">Submit</button></form>';
+    const lcStarter = 'class Solution {\npublic:\n    vector<int> twoSum(vector<int>& nums, int target) {\n    }\n};';
+    // Mock only the public metadata request. Real extension messaging, native
+    // file creation and MAIN-world Monaco writes are exercised below.
+    await worker.evaluate(starter => {
+      globalThis.originalFetch = globalThis.fetch;
+      globalThis.lcFetchMode = 'ok';
+      globalThis.fetch = async (url, options) => {
+        if (/^https:\/\/leetcode\.(cn|com)\/graphql\/$/.test(String(url))) {
+          globalThis.lastLCRequest = {url:String(url),credentials:options.credentials,redirect:options.redirect,body:JSON.parse(options.body)};
+          if (globalThis.lcFetchMode === 'offline') throw new Error('synthetic offline');
+          const slug = JSON.parse(options.body).variables.titleSlug;
+          return new Response(JSON.stringify({data:{question:{titleSlug:globalThis.lcFetchMode==='wrong'?'another-problem':slug,questionFrontendId:'1',title:'Two Sum',translatedTitle:'两数之和',codeSnippets:[{langSlug:'cpp',code:starter}]}}}), {status:200});
+        }
+        return globalThis.originalFetch(url, options);
+      };
+    }, lcStarter);
+    const lcHtml = `<!doctype html><title>1. 两数之和 - 力扣（LeetCode）</title><h1>1. 两数之和</h1><div id="cpp" class="monaco-editor" style="height:100px">source</div><div id="cases" class="monaco-editor" style="height:100px">testcase</div><div id="hidden" class="monaco-editor" style="display:none">hidden</div><script>
+      window.lcSource='initial';window.lcCases='[1,2]';window.lcLanguage='cpp';window.lcSubmissions=0;
+      const sourceModel={getLanguageId:()=>window.lcLanguage,getValue:()=>window.lcSource,setValue:v=>window.lcSource=v};
+      const caseModel={getLanguageId:()=> 'plaintext',getValue:()=>window.lcCases,setValue:v=>window.lcCases=v};
+      const hiddenModel={getLanguageId:()=> 'cpp',getValue:()=> 'hidden',setValue:()=>{throw new Error('must not write hidden model')}};
+      window.monaco={editor:{getEditors:()=>[{getDomNode:()=>document.getElementById('cpp'),getModel:()=>sourceModel},{getDomNode:()=>document.getElementById('cases'),getModel:()=>caseModel},{getDomNode:()=>document.getElementById('hidden'),getModel:()=>hiddenModel}]}};
+      </script><button onclick="window.lcSubmissions++">提交</button>`;
+    for (const host of ['leetcode.cn','leetcode.com']) await t.test(`${host}：官方 C++ 模板建文件、复制和回填，保留测试用例`, async () => {
+      await context.route(`https://${host}/**`, route => route.fulfill({contentType:'text/html; charset=utf-8',body:lcHtml}));
+      const lc = await context.newPage(); await lc.goto(`https://${host}/problems/two-sum/description/`);await lc.waitForSelector('#oj-bridge-root');
+      const id=await worker.evaluate(async url=>(await chrome.tabs.query({})).find(t=>t.url===url).id,lc.url());
+      const run=operation=>worker.evaluate(async({id,operation})=>chrome.tabs.sendMessage(id,{action:'popupAction',operation}),{id,operation});
+      const created=await run('open');assert.equal(created.ok,true,created.error);
+      assert.equal(path.basename(created.path),`${host.endsWith('.cn')?'LeetCodeCN':'LeetCode'}_1.cpp`);
+      const initial=fs.readFileSync(created.path,'utf8');assert.ok(initial.includes(lcStarter));assert.ok(!initial.includes('int main()'));
+      const request=await worker.evaluate(()=>lastLCRequest);assert.equal(request.credentials,'omit');assert.equal(request.redirect,'error');assert.equal(request.body.variables.titleSlug,'two-sum');
+      fs.writeFileSync(created.path,'// saved locally\n'+lcStarter);
+      const copied=await run('copy');assert.equal(copied.ok,true,copied.error);assert.equal(copied.code,fs.readFileSync(created.path,'utf8'));
+      const filled=await run('fill');assert.equal(filled.ok,true,filled.error);assert.equal(filled.editor,'LeetCode Monaco');
+      assert.equal(await lc.evaluate(()=>lcSource),copied.code);assert.equal(await lc.evaluate(()=>lcCases),'[1,2]');assert.equal(await lc.evaluate(()=>lcSubmissions),0);
+      const submit=await run('submit');assert.equal(submit.ok,false);assert.equal(await lc.evaluate(()=>lcSubmissions),0);
+      await lc.evaluate(()=>{window.lcLanguage='python';window.lcSource='# existing Python code';});
+      const refused=await run('fill');assert.equal(refused.ok,false);assert.match(refused.error,/选择 C\+\+/);assert.equal(await lc.evaluate(()=>lcSource),'# existing Python code');
+      await lc.evaluate(()=>{window.lcLanguage='cpp';const original=window.monaco.editor.getEditors;window.monaco.editor.getEditors=()=>{const editors=original();return [...editors,{getDomNode:()=>document.getElementById('cases'),getModel:()=>editors[0].getModel()}]};});
+      const ambiguous=await run('fill');assert.equal(ambiguous.ok,false);assert.equal(await lc.evaluate(()=>lcSource),'# existing Python code');
+      await worker.evaluate(()=>globalThis.lcFetchMode='offline');
+      const reopened=await run('open');assert.equal(reopened.ok,true,reopened.error);assert.equal(reopened.created,false);assert.equal(fs.readFileSync(created.path,'utf8'),copied.code);
+      await worker.evaluate(()=>globalThis.lcFetchMode='ok');
+      await lc.close();
+    });
+    await t.test('力扣 SPA 切题后接口题目不匹配或离线时，不创建错误/空源码', async () => {
+      const lc=await context.newPage();await lc.goto('https://leetcode.cn/problems/two-sum/description/');await lc.waitForSelector('#oj-bridge-root');
+      const id=await worker.evaluate(async url=>(await chrome.tabs.query({})).find(t=>t.url===url).id,lc.url());
+      await lc.evaluate(()=>{history.pushState({},'', '/problems/lru-cache/description/');document.title='146. LRU 缓存 - 力扣';document.querySelector('h1').textContent='146. LRU 缓存';});
+      await worker.evaluate(()=>globalThis.lcFetchMode='wrong');
+      const result=await worker.evaluate(async id=>chrome.tabs.sendMessage(id,{action:'popupAction',operation:'open'}),id);
+      assert.equal(result.ok,false);assert.match(result.error,/题目链接与当前页面不一致|官方 C\+\+/);
+      // Let the content script capture the SPA route, then test a real offline creation.
+      for(let i=0;i<30;i++) { const ctx=await worker.evaluate(async id=>chrome.tabs.sendMessage(id,{action:'popupContext'}),id);if(ctx.problem?.id==='lru-cache')break;await delay(100); }
+      const mismatch=await worker.evaluate(async id=>chrome.tabs.sendMessage(id,{action:'popupAction',operation:'open'}),id);
+      assert.equal(mismatch.ok,false);assert.match(mismatch.error,/官方 C\+\+/);
+      await worker.evaluate(()=>globalThis.lcFetchMode='offline');
+      const offline=await worker.evaluate(async id=>chrome.tabs.sendMessage(id,{action:'popupAction',operation:'open'}),id);
+      assert.equal(offline.ok,false);assert.match(offline.error,/官方 C\+\+/);assert.equal(fs.readdirSync(codeRoot).filter(x=>/lru-cache/.test(x)).length,0);
+      await worker.evaluate(()=>globalThis.lcFetchMode='ok');await lc.close();
+    });
+    await worker.evaluate(()=>{globalThis.fetch=globalThis.originalFetch;delete globalThis.originalFetch;});
     await t.test('AtCoder 模拟页面：从题目跳转到提交页并自动填入、提交一次', async () => {
       await context.route('https://atcoder.jp/**', route => route.fulfill({ contentType: 'text/html; charset=utf-8', body: route.request().url().includes('/tasks/') ? '<!doctype html><h1 class="h2">A - Sigma Cubes</h1>' : `<!doctype html>${baseForm}<textarea name="sourceCode" style="height:150px;width:400px"></textarea><script>window.syntheticSubmissions=0;document.querySelector('form').addEventListener('submit',e=>{e.preventDefault();window.syntheticSubmissions++;});</script>` }));
       const atcoder = await context.newPage(); await atcoder.goto(taskOptions.url); await atcoder.waitForSelector('#oj-bridge-root');

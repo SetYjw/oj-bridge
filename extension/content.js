@@ -76,6 +76,7 @@
       if (!container) build();
       container.style.display = 'block';
       title.textContent = `${problem.label} · ${problem.id}\n${problem.title}`;
+      shadow.querySelector('.hint').textContent = OJCore.isLeetCode(problem) ? '先 Ctrl+S 保存 · 网页选择 C++ 后填入' : '读取已保存的 .cpp · 写完后先按 Ctrl+S';
       shadow.querySelector('[data-action="submit"]').hidden = !problem.canSubmit;
       note('准备就绪。首次使用请先检测连接。');
       // A navigation can leave the editor mounting after document_idle.

@@ -16,7 +16,7 @@ import time
 import uuid
 from urllib.parse import urlsplit, urlunsplit
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 EXTENSION_ID = "bilbnpgbepfpocfaakmnmcejfpdofocp"
 ORIGIN = f"chrome-extension://{EXTENSION_ID}/"
 MAX_MESSAGE = 768 * 1024
@@ -73,7 +73,13 @@ def parse_problem_url(raw):
         raise BridgeError("仅支持已适配 OJ 的 HTTPS 题目链接。")
     path = u.path.rstrip("/")
     platform = pid = canonical_path = None
-    if host in ("www.luogu.com.cn", "www.luogu.com", "luogu.com.cn", "luogu.com"):
+    if host in ("leetcode.cn", "www.leetcode.cn", "leetcode.com", "www.leetcode.com"):
+        match = re.fullmatch(r"/(?:contest/[A-Za-z0-9_-]+/)?problems/([a-z0-9-]+)(?:/(?:description|editorial|solutions|submissions))?", path)
+        if match:
+            host = host.removeprefix("www.")
+            platform, pid = "LeetCodeCN" if host == "leetcode.cn" else "LeetCode", match[1]
+            canonical_path = f"/problems/{pid}"
+    elif host in ("www.luogu.com.cn", "www.luogu.com", "luogu.com.cn", "luogu.com"):
         match = re.fullmatch(r"/problem/([A-Za-z0-9_-]+)(?:/submit)?", path)
         if match:
             platform, pid = "Luogu", match[1]
@@ -124,6 +130,9 @@ def problem_info(value):
     info.update({name: clean_text(value.get(name), limit) for name, limit in (
         ("title", 180), ("timeLimit", 120), ("memoryLimit", 120))})
     info["title"] = info["title"] or info["id"]
+    if info["platform"] in ("LeetCode", "LeetCodeCN"):
+        info["frontendId"] = clean_text(value.get("frontendId"), 80)
+        info["starterCode"] = value.get("starterCode", "")
     return info
 
 
@@ -214,12 +223,17 @@ class Host:
     def source_text(self, info):
         def comment(s):
             return s.replace("*/", "* /")
-        fields = [("平台", info["platform"]), ("题号", info["id"]), ("题目", info["title"]), ("链接", info["url"])]
+        fields = [("平台", info["platform"]), ("题号", info.get("frontendId") or info["id"]), ("题目", info["title"]), ("链接", info["url"])]
         if info["timeLimit"]:
             fields.append(("时限", info["timeLimit"]))
         if info["memoryLimit"]:
             fields.append(("内存", info["memoryLimit"]))
         header = "/*\n" + "\n".join(f" * {label}：{comment(value)}" for label, value in fields) + "\n */\n\n"
+        if info["platform"] in ("LeetCode", "LeetCodeCN"):
+            starter = info.get("starterCode")
+            if not isinstance(starter, str) or not starter.strip() or len(starter) > 32768 or "\0" in starter:
+                raise BridgeError("未取得力扣官方 C++ 初始代码，未创建文件。请确保题目可访问，刷新后重试；已有文件仍可打开或复制。")
+            return header + "#include<bits/stdc++.h>\nusing namespace std;\n\n" + starter.replace("\r\n", "\n").rstrip() + "\n"
         return header + self.config["template"].replace("\r\n", "\n")
 
     def find_or_create(self, value, create):
@@ -237,7 +251,8 @@ class Host:
                 return path, info, False
             if not create:
                 raise BridgeError("这道题还没有本地文件，请先点击“在 VS Code 编程”。")
-            stem = f'{info["platform"]}_{info["id"]}'
+            source = self.source_text(info)
+            stem = f'{info["platform"]}_{info.get("frontendId") or info["id"]}'
             if self.config["naming"] == "platform_id_title":
                 stem += "_" + info["title"]
             stem = safe_name(stem)
@@ -248,8 +263,8 @@ class Host:
                 path = self.checked_file(f"{stem}_{key[:8]}{'_' + str(n) if n > 1 else ''}.cpp")
             # Exclusive creation protects unrelated files even under a concurrent external writer.
             with open(path, "x", encoding="utf-8", newline="\n") as f:
-                f.write(self.source_text(info))
-            index[key] = {"file": path.name, **info}
+                f.write(source)
+            index[key] = {"file": path.name, **{k: v for k, v in info.items() if k != "starterCode"}}
             atomic_json(index_path, index)
             return path, info, True
 

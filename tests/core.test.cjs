@@ -10,10 +10,36 @@ const fixtures = [
   ['https://ac.nowcoder.com/acm/contest/12345/A', 'NowCoder', '12345_A', 'https://ac.nowcoder.com/acm/contest/12345/A'],
   ['https://loj.ac/p/1000', 'LibreOJ', '1000', 'https://loj.ac/p/1000'],
   ['https://hydro.ac/d/test/p/P1000/submit', 'Hydro', 'test_P1000', 'https://hydro.ac/d/test/p/P1000'],
+  ['https://leetcode.cn/problems/two-sum/description/?envType=study-plan-v2', 'LeetCodeCN', 'two-sum', 'https://leetcode.cn/problems/two-sum'],
+  ['https://www.leetcode.com/problems/two-sum/solutions/', 'LeetCode', 'two-sum', 'https://leetcode.com/problems/two-sum'],
+  ['https://leetcode.cn/problems/lru-cache/', 'LeetCodeCN', 'lru-cache', 'https://leetcode.cn/problems/lru-cache'],
+  ['https://leetcode.com/contest/weekly-contest-400/problems/two-sum/', 'LeetCode', 'two-sum', 'https://leetcode.com/problems/two-sum'],
 ];
 for (const [url, platform, id, canonical] of fixtures) test(`识别 ${platform} ${id}`, () => {
   const result = core.parseUrl(url); assert.equal(result.platform, platform); assert.equal(result.id, id); assert.equal(result.url, canonical);
   assert.ok(core.isSubmitFor(result.submitUrl, result));
+});
+
+test('力扣子页面和比赛链接保持同一题目身份，中英文站独立', () => {
+  const p = core.parseUrl('https://leetcode.cn/problems/two-sum/');
+  for (const url of ['https://leetcode.cn/problems/two-sum/description/', 'https://leetcode.cn/problems/two-sum/submissions/', 'https://leetcode.cn/contest/weekly-contest-400/problems/two-sum/']) assert.equal(core.isSubmitFor(url,p),true);
+  for (const url of ['https://leetcode.com/problems/two-sum/', 'https://leetcode.cn/problems/lru-cache/', 'https://leetcode.cn.evil.test/problems/two-sum/', 'https://leetcode.cn/submissions/detail/123/', 'https://leetcode.cn/problems/', 'https://leetcode.cn/problems/two-sum/solutions/123/answer/']) assert.equal(core.isSubmitFor(url,p),false);
+  assert.equal(p.canSubmit,false);
+});
+
+test('力扣官方模板按 C++ 语言和 slug 校验，保留设计题类名', () => {
+  const problem=core.parseUrl('https://leetcode.cn/problems/lru-cache/');
+  const data={data:{question:{titleSlug:'lru-cache',questionFrontendId:'146',title:'LRU Cache',translatedTitle:'LRU 缓存',codeSnippets:[{langSlug:'python3',code:'class LRUCache:'},{langSlug:'cpp',code:'class LRUCache {};'}]}}};
+  assert.deepEqual(core.leetCodeMetadata(data,problem),{title:'LRU 缓存',frontendId:'146',starterCode:'class LRUCache {};'});
+  assert.throws(()=>core.leetCodeMetadata(data,core.parseUrl('https://leetcode.cn/problems/two-sum/')),/不一致/);
+  for (const code of ['', 'x'.repeat(32769), '\0bad']) assert.throws(()=>core.leetCodeMetadata({data:{question:{...data.data.question,codeSnippets:[{langSlug:'cpp',code}]}}},problem),/C\+\+/);
+  assert.throws(()=>core.leetCodeMetadata({data:{question:{...data.data.question,codeSnippets:[{langSlug:'java',code:'class X {}'}]}}},problem),/C\+\+/);
+});
+
+test('力扣标题可从文档标题解析中文和英文', () => {
+  for (const [host,title,expected] of [['leetcode.cn','1. 两数之和 - 力扣（LeetCode）','两数之和'],['leetcode.com','Two Sum - LeetCode','Two Sum']]) {
+    assert.equal(core.readProblem({title,querySelector(){return null;},body:{innerText:''}},`https://${host}/problems/two-sum/`).title,expected);
+  }
 });
 test('拒绝伪装域名、非 HTTPS、凭据和非题目页', () => {
   for (const url of ['https://luogu.com.cn.evil.test/problem/P1','http://www.luogu.com.cn/problem/P1','https://a:b@www.luogu.com.cn/problem/P1','https://atcoder.jp/contests/abc425','https://www.luogu.com.cn:444/problem/P1','file:///tmp/example.cpp']) assert.equal(core.parseUrl(url), null, url);

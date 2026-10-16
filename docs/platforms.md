@@ -11,8 +11,11 @@
 | 牛客竞赛 | `ac.nowcoder.com/acm/contest/比赛/题号` | 已实现 | 在当前页面打开代码区后尝试填入 | 不提供 |
 | LibreOJ | `loj.ac/p/数字题号` | 已实现 | 尝试 `#submit`，需要先展开编辑器 | 不提供 |
 | Hydro | `hydro.ac`、`hydrooj.com` 及其子域的 `/p/题号`、`/d/域/p/题号` | 已实现 | 尝试对应 `/submit` 页 | 条件支持原生表单 |
+| 力扣中文站 / LeetCode 国际站 | `leetcode.cn`、`leetcode.com` 的 `/problems/slug` 及 description/editorial/solutions/submissions 子页、`/contest/比赛/problems/slug` | 官方 C++ 函数/类模板，题号命名；同站题库和比赛链接共用文件，中英文站独立 | 先在网页选择 C++；只写入唯一可见 C++ Monaco 编辑器，保留测试用例 | 使用网页原有按钮手动提交 |
 
 自建 Hydro 的任意其他域名不在默认权限内；本版不对所有网站申请读取权限。题库之外的比赛专用链接、邀请赛域名、其他 S2OJ/SYZOJ 路由需要单独扩展适配。
+
+力扣代码模板来自当前站点公开 GraphQL 题目信息，不包含解答。首次获取模板失败时不创建文件，已有文件可以离线重新打开或复制。设计题保留官方类名；不添加 `main()`。会员或未公开题目仍受网站本身的访问限制，插件不会绕过限制。具体题解详情页和全站提交详情页不识别为题目入口。
 
 网页编辑器支持路径：textarea、Monaco、Ace、CodeMirror 5，以及可访问 EditorView 的 CodeMirror 6。某些网站将编辑器接口完全封装在框架内部，仍需手动复制。多个编辑器或 Monaco 模型无法唯一识别时会停止，避免向无关编辑区写入。
 
